@@ -11,7 +11,7 @@ export const getNudgeMessage = async (tasks: string[], productivityHours: { star
       Pending tasks: ${tasks.join(', ') || 'Nothing listed yet'}.
       Status: ${isIdle ? 'User is IDLE (not using timer, no recent tasks done)' : 'User is active but needs a push'}.
       
-      Act as "Re-Mager", the ultimate Anti-Mager (Anti-Lazy) assistant. Your personality is "cerewet" (nagging), high-energy, and funny in Indonesian. 
+      Act as "De-Mager", the ultimate Anti-Mager (Anti-Lazy) assistant. Your personality is "cerewet" (nagging), high-energy, and funny in Indonesian. 
       Combat "mager" (laziness) at all costs!
       
       If idle: Strongly nudge them to stop being mager. Remind them their future self is watching.

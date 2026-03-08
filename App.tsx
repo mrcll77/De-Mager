@@ -31,7 +31,7 @@ function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
-const STORAGE_KEY = 'momentum_timer_state';
+const STORAGE_KEY = 'demager_timer_state';
 
 const App: React.FC = () => {
   const [activeView, setActiveView] = useState<'task' | 'timer' | 'calendar' | 'knowledge' | null>(null);
@@ -98,10 +98,10 @@ const App: React.FC = () => {
     
     // Browser Notification
     if ("Notification" in window && Notification.permission === "granted") {
-      new Notification("MOMENTUM: Waktunya Beraksi!", {
+      new Notification("DE-MAGER: Waktunya Beraksi!", {
         body: type === 'timer' ? `Sesi ${title} telah selesai!` : `Misi: ${title}`,
         icon: "/favicon.ico", // Standard fallback
-        tag: id || 'momentum-alarm',
+        tag: id || 'demager-alarm',
         requireInteraction: true
       });
     }
@@ -211,7 +211,7 @@ const App: React.FC = () => {
               <Bell className="w-5 h-5 text-indigo-400" />
             </div>
             <div className="flex-1 min-w-0">
-              <h4 className="text-xs font-black text-white uppercase tracking-tighter mb-1">ALERT AKTIVITAS: Momentum!</h4>
+              <h4 className="text-xs font-black text-white uppercase tracking-tighter mb-1">ALERT AKTIVITAS: De-Mager!</h4>
               <p className="text-[10px] font-bold text-slate-400 leading-relaxed">
                 Ini jam produktifmu. Ayo mulai sesi fokus atau lakukan olahraga ringan!
               </p>
@@ -241,7 +241,7 @@ const App: React.FC = () => {
           </div>
           <div>
             <h3 className="text-sm font-black text-white uppercase tracking-tighter">AI ADVISOR</h3>
-            <p className="text-[10px] font-bold text-indigo-400 uppercase tracking-widest">Anti-mager App</p>
+            <p className="text-[10px] font-bold text-indigo-400 uppercase tracking-widest">De-Mager App</p>
           </div>
           <button onClick={() => setShowAIAdvisor(false)} className="ml-auto p-1.5 hover:bg-white/5 rounded-lg text-slate-500">
             <X className="w-4 h-4" />

@@ -148,7 +148,7 @@ export const KnowledgeHub: React.FC<KnowledgeHubProps> = ({ chatHistory, onSendM
             <Bot className="w-6 h-6 text-white" />
           </div>
           <div>
-            <h3 className="text-lg font-black uppercase tracking-tighter text-white">Anti-Sedentary AI</h3>
+            <h3 className="text-lg font-black uppercase tracking-tighter text-white">De-Mager AI</h3>
             <p className="text-[10px] font-black text-indigo-400 uppercase tracking-widest">Health Consultant</p>
           </div>
         </div>
