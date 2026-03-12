@@ -4,7 +4,7 @@ import { TimerMode } from '../types';
 import { motion, AnimatePresence } from 'framer-motion';
 
 interface TimerComponentProps {
-  onComplete: (mode: TimerMode) => void;
+  onComplete: (mode: TimerMode, duration: number) => void;
   onStatusChange: (isActive: boolean) => void;
 }
 
@@ -49,7 +49,7 @@ export const TimerComponent: React.FC<TimerComponentProps> = ({ onComplete, onSt
             clearTimer();
             setIsActive(false);
             onStatusChange(false);
-            onComplete(mode);
+            onComplete(mode, MODE_CONFIG[mode].duration);
             return 0;
           }
           return prev - 1;

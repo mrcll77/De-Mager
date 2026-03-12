@@ -28,9 +28,26 @@ export interface ChatMessage {
   timestamp: number;
 }
 
+export interface UserProfile {
+  name: string;
+  age: number;
+  goal: string;
+  isSetup: boolean;
+}
+
+export interface TimerSession {
+  id: string;
+  mode: TimerMode;
+  duration: number; // in seconds
+  timestamp: number;
+}
+
 export interface AppState {
   tasks: Task[];
   productivityHours: ProductivityHours;
   lastNudgeTime: number;
   chatHistory: ChatMessage[];
+  userProfile: UserProfile;
+  timerSessions: TimerSession[];
+  nudgeCount: number;
 }

@@ -5,7 +5,9 @@ import { TimerComponent } from './components/TimerComponent';
 import { TaskList } from './components/TaskList';
 import { CalendarView } from './components/CalendarView';
 import { KnowledgeHub } from './components/KnowledgeHub';
-import { TimerMode, Task, AppState, ProductivityHours, ChatMessage } from './types';
+import { Dashboard } from './components/Dashboard';
+import { ProfileSettings } from './components/ProfileSettings';
+import { TimerMode, Task, AppState, ProductivityHours, ChatMessage, UserProfile, TimerSession } from './types';
 import { getNudgeMessage } from './services/geminiService';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
@@ -24,7 +26,9 @@ import {
   X,
   Clock,
   Book,
-  Lightbulb
+  Lightbulb,
+  LayoutDashboard,
+  User as UserIcon
 } from 'lucide-react';
 
 function cn(...inputs: ClassValue[]) {
@@ -34,14 +38,17 @@ function cn(...inputs: ClassValue[]) {
 const STORAGE_KEY = 'demager_timer_state';
 
 const App: React.FC = () => {
-  const [activeView, setActiveView] = useState<'task' | 'timer' | 'calendar' | 'knowledge' | null>(null);
+  const [activeView, setActiveView] = useState<'task' | 'timer' | 'calendar' | 'knowledge' | 'dashboard' | 'profile' | null>(null);
   const [state, setState] = useState<AppState>(() => {
     const saved = localStorage.getItem(STORAGE_KEY);
     if (saved) {
       const parsed = JSON.parse(saved);
       return {
         ...parsed,
-        chatHistory: parsed.chatHistory || []
+        chatHistory: parsed.chatHistory || [],
+        userProfile: parsed.userProfile || { name: '', age: 15, goal: '', isSetup: false },
+        timerSessions: parsed.timerSessions || [],
+        nudgeCount: parsed.nudgeCount || 0
       };
     }
     
@@ -49,17 +56,22 @@ const App: React.FC = () => {
       tasks: [],
       productivityHours: { start: '08:00', end: '18:00' },
       lastNudgeTime: 0,
-      chatHistory: []
+      chatHistory: [],
+      userProfile: { name: '', age: 15, goal: '', isSetup: false },
+      timerSessions: [],
+      nudgeCount: 0
     };
   });
 
   const [currentTime, setCurrentTime] = useState(new Date());
   const [nudge, setNudge] = useState<string | null>(null);
   const [showAIAdvisor, setShowAIAdvisor] = useState(false);
-  const [showProactive, setShowProactive] = useState(true);
+  const [showProactive, setShowProactive] = useState(false);
+  const [isTimerActive, setIsTimerActive] = useState(false);
   const [activeAlarm, setActiveAlarm] = useState<{ id?: string; title: string; type: 'timer' | 'task' } | null>(null);
   const triggeredAlarms = useRef<Set<string>>(new Set());
   const alarmAudio = useRef<HTMLAudioElement | null>(null);
+  const lastInteractionTime = useRef<number>(Date.now());
 
   // Initialize Audio & Notification Permission
   useEffect(() => {
@@ -70,7 +82,51 @@ const App: React.FC = () => {
     if ("Notification" in window && Notification.permission === "default") {
       Notification.requestPermission();
     }
+
+    // Track interactions for idleness
+    const handleInteraction = () => {
+      lastInteractionTime.current = Date.now();
+    };
+    window.addEventListener('mousedown', handleInteraction);
+    window.addEventListener('keydown', handleInteraction);
+    return () => {
+      window.removeEventListener('mousedown', handleInteraction);
+      window.removeEventListener('keydown', handleInteraction);
+    };
   }, []);
+
+  // Proactive Nudge Logic
+  useEffect(() => {
+    const checkNudge = async () => {
+      const now = new Date();
+      const timeStr = now.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', hour12: false }).replace('.', ':');
+      
+      const { start, end } = state.productivityHours;
+      const isProductiveHour = timeStr >= start && timeStr <= end;
+      
+      // If it's productive hour, user is not on timer, and hasn't interacted for 15 mins
+      const isIdle = (Date.now() - lastInteractionTime.current) > 15 * 60 * 1000;
+      const shouldNudge = isProductiveHour && !isTimerActive && isIdle;
+      
+      // Only nudge once every 30 minutes
+      const thirtyMinsAgo = Date.now() - 30 * 60 * 1000;
+      
+      if (shouldNudge && state.lastNudgeTime < thirtyMinsAgo) {
+        const pendingTasks = state.tasks.filter(t => !t.isCompleted).map(t => t.title);
+        const message = await getNudgeMessage(pendingTasks, state.productivityHours, true);
+        setNudge(message);
+        setShowProactive(true);
+        setState(prev => ({ 
+          ...prev, 
+          lastNudgeTime: Date.now(),
+          nudgeCount: (prev.nudgeCount || 0) + 1
+        }));
+      }
+    };
+
+    const interval = setInterval(checkNudge, 60000); // Check every minute
+    return () => clearInterval(interval);
+  }, [state.productivityHours, state.tasks, state.lastNudgeTime, isTimerActive]);
 
   // Real-time Clock & Task Alarm Check
   useEffect(() => {
@@ -196,9 +252,28 @@ const App: React.FC = () => {
     setState(prev => ({ ...prev, chatHistory: [...prev.chatHistory, newMessage] }));
   };
 
+  const handleSaveProfile = (profile: UserProfile) => {
+    setState(prev => ({ ...prev, userProfile: profile }));
+    if (activeView === 'profile') setActiveView(null);
+  };
+
+  const handleTimerComplete = (mode: TimerMode, duration: number) => {
+    const newSession: TimerSession = {
+      id: Math.random().toString(36).substr(2, 9),
+      mode,
+      duration,
+      timestamp: Date.now()
+    };
+    setState(prev => ({
+      ...prev,
+      timerSessions: [...prev.timerSessions, newSession]
+    }));
+    triggerAlarm(`${mode} Session Complete`, 'timer');
+  };
+
   const ProactiveNotification = () => (
     <AnimatePresence>
-      {showProactive && (
+      {showProactive && nudge && (
         <motion.div 
           initial={{ opacity: 0, x: 50, scale: 0.9 }}
           animate={{ opacity: 1, x: 0, scale: 1 }}
@@ -213,7 +288,7 @@ const App: React.FC = () => {
             <div className="flex-1 min-w-0">
               <h4 className="text-xs font-black text-white uppercase tracking-tighter mb-1">ALERT AKTIVITAS: De-Mager!</h4>
               <p className="text-[10px] font-bold text-slate-400 leading-relaxed">
-                Ini jam produktifmu. Ayo mulai sesi fokus atau lakukan olahraga ringan!
+                {nudge}
               </p>
             </div>
             <button 
@@ -439,7 +514,11 @@ const App: React.FC = () => {
                 <ArrowLeft className="w-6 h-6" />
               </button>
               <h2 className="text-xl font-black uppercase tracking-tighter">
-                {activeView === 'task' ? 'TASK MENU' : activeView === 'timer' ? 'TIMER MENU' : activeView === 'calendar' ? 'CALENDAR MENU' : 'KNOWLEDGE HUB'}
+                {activeView === 'task' ? 'TASK MENU' : 
+                 activeView === 'timer' ? 'TIMER MENU' : 
+                 activeView === 'calendar' ? 'CALENDAR MENU' : 
+                 activeView === 'knowledge' ? 'KNOWLEDGE HUB' :
+                 activeView === 'dashboard' ? 'DASHBOARD' : 'USER PROFILE'}
               </h2>
             </div>
             
@@ -455,8 +534,8 @@ const App: React.FC = () => {
               )}
               {activeView === 'timer' && (
                 <TimerComponent 
-                  onComplete={(mode) => triggerAlarm(`${mode} Session Complete`, 'timer')} 
-                  onStatusChange={(active) => console.log('Timer active:', active)} 
+                  onComplete={handleTimerComplete} 
+                  onStatusChange={(active) => setIsTimerActive(active)} 
                 />
               )}
               {activeView === 'calendar' && (
@@ -474,24 +553,66 @@ const App: React.FC = () => {
                   onReceiveMessage={handleReceiveChatMessage}
                 />
               )}
+              {activeView === 'dashboard' && (
+                <Dashboard state={state} />
+              )}
+              {activeView === 'profile' && (
+                <ProfileSettings profile={state.userProfile} onSave={handleSaveProfile} />
+              )}
             </div>
           </motion.div>
         )}
       </AnimatePresence>
 
-      {/* Floating Knowledge Button */}
+      {/* Floating Buttons */}
       {!activeView && (
-        <motion.button
-          initial={{ opacity: 0, scale: 0.8, x: -20 }}
-          animate={{ opacity: 1, scale: 1, x: 0 }}
-          whileHover={{ scale: 1.1 }}
-          whileTap={{ scale: 0.9 }}
-          onClick={() => setActiveView('knowledge')}
-          className="fixed bottom-8 left-8 w-14 h-14 bg-indigo-600 hover:bg-indigo-500 rounded-full flex items-center justify-center shadow-2xl shadow-indigo-900/50 transition-all z-[100] border border-indigo-400/30"
-        >
-          <Lightbulb className="w-6 h-6 text-white fill-current" />
-        </motion.button>
+        <div className="fixed bottom-8 left-8 flex flex-col gap-4 z-[100]">
+          <motion.button
+            initial={{ opacity: 0, scale: 0.8, x: -20 }}
+            animate={{ opacity: 1, scale: 1, x: 0 }}
+            whileHover={{ scale: 1.1 }}
+            whileTap={{ scale: 0.9 }}
+            onClick={() => setActiveView('dashboard')}
+            className="w-14 h-14 bg-emerald-600 hover:bg-emerald-500 rounded-full flex items-center justify-center shadow-2xl shadow-emerald-900/50 transition-all border border-emerald-400/30"
+          >
+            <LayoutDashboard className="w-6 h-6 text-white" />
+          </motion.button>
+          <motion.button
+            initial={{ opacity: 0, scale: 0.8, x: -20 }}
+            animate={{ opacity: 1, scale: 1, x: 0 }}
+            whileHover={{ scale: 1.1 }}
+            whileTap={{ scale: 0.9 }}
+            onClick={() => setActiveView('knowledge')}
+            className="w-14 h-14 bg-indigo-600 hover:bg-indigo-500 rounded-full flex items-center justify-center shadow-2xl shadow-indigo-900/50 transition-all border border-indigo-400/30"
+          >
+            <Lightbulb className="w-6 h-6 text-white fill-current" />
+          </motion.button>
+          <motion.button
+            initial={{ opacity: 0, scale: 0.8, x: -20 }}
+            animate={{ opacity: 1, scale: 1, x: 0 }}
+            whileHover={{ scale: 1.1 }}
+            whileTap={{ scale: 0.9 }}
+            onClick={() => setActiveView('profile')}
+            className="w-14 h-14 bg-slate-800 hover:bg-slate-700 rounded-full flex items-center justify-center shadow-2xl shadow-slate-900/50 transition-all border border-white/10"
+          >
+            <UserIcon className="w-6 h-6 text-white" />
+          </motion.button>
+        </div>
       )}
+
+      {/* Initial Setup Overlay */}
+      <AnimatePresence>
+        {!state.userProfile.isSetup && (
+          <motion.div 
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[300]"
+          >
+            <ProfileSettings profile={state.userProfile} onSave={handleSaveProfile} />
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {showAIAdvisor && <AIAdvisorCard />}
       <ProactiveNotification />
